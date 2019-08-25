@@ -1,0 +1,35 @@
+---
+# ========================================================#
+#                ACFS Setup  - Test with Snap             #
+# ========================================================#
+- name: ACFS Create acfs snap status
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  shell: "export GRID_HOME={{ grid_home }}; acfsutil snap create verify_snap {{ acfs_mount_name }}"
+  register: acfssnap_create
+  ignore_errors: True
+
+- name: show result of ACFS filesystem status
+  when: inventory_hostname in groups['ora-x1']
+  debug:
+    msg: "{{ acfssnap_create.stdout_lines }}"
+    verbosity: 0
+
+- name: ACFS status
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  shell: "export GRID_HOME={{ grid_home }}; acfsutil snap info {{ acfs_mount_name }}"
+  register: acfssnap_stat
+  ignore_errors: True
+
+- name: show result of ACFS filesystem status
+  when: inventory_hostname in groups['ora-x1']
+  debug:
+    msg: "{{ acfssnap_stat.stdout_lines }}"
+    verbosity: 0
+
+

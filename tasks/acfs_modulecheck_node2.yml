@@ -1,0 +1,57 @@
+---
+# ========================================================#
+# Check ACFS Module install and load status ( on node 2 ) #
+# ========================================================#
+- name: Get ACFS module install status
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  when: inventory_hostname in groups['ora-x2']
+  shell: export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/acfsdriverstate -orahome {{ grid_home }} installed | awk {'print $2'}
+  register: acfsmodinsexist
+  ignore_errors: yes
+
+- name: ACFS/ADVM modules install
+  when: inventory_hostname in groups['ora-x2'] and acfsmodinsexist.changed == false
+  remote_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/acfsroot install
+
+- name: Get ACFS module install status message
+  when: inventory_hostname in groups['ora-x2'] and acfsmodinsexist.changed == true
+  debug:
+    msg: "ACFS/ADVM modules already installed"
+    verbosity: 0
+
+- name: Get ACFS module load status
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  when: inventory_hostname in groups['ora-x2']
+  shell: export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/acfsdriverstate -orahome {{ grid_home }} loaded | awk {'print $2'}
+  register: acfsmodexist
+  ignore_errors: yes
+
+- name: ACFS/ADVM modules load status
+  when: inventory_hostname in groups['ora-x2'] and acfsmodexist.changed == false
+  remote_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/acfsload start
+
+- name: Stop CRS on node 
+  when: inventory_hostname in groups['ora-x2'] and acfsmodexist.changed == false
+  remote_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/crsctl stop start
+  ignore_errors: yes
+  tags: acfs
+
+- name: Start CRS 
+  when: inventory_hostname in groups['ora-x2'] and acfsmodexist.changed == false
+  remote_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/crsctl start start
+  ignore_errors: yes
+  tags: acfs
+
+- name: Get ACFS module load status message
+  when: inventory_hostname in groups['ora-x2'] and acfsmodexist.changed == true
+  debug:
+    msg: "ACFS/ADVM modules already loaded"
+    verbosity: 0

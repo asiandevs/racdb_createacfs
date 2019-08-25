@@ -1,0 +1,88 @@
+---
+# ========================================================#
+#                    ACFS Setup                           #
+# ========================================================#
+  
+- name: Get ACFS diskgroup status
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  when: inventory_hostname in groups['ora-x1']
+  shell: 'export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/srvctl status diskgroup -g {{ acfsdiskgroup }}'
+  register: acfsdgexist
+  failed_when: acfsdgexist.rc >= 2
+  ignore_errors: yes
+
+- debug:
+    var: acfsdgexist
+    verbosity: 2
+
+- name: show result if Disk Group {{ acfsdiskgroup }} - exist and already up
+  when: inventory_hostname in groups['ora-x1'] and acfsdgexist.stdout.find('does not exist') != 1
+  debug:
+    msg: "{{ acfsdgexist.stdout_lines }}"
+  ignore_errors: yes
+
+- name: ASMCA | Create ACFS diskgroups - exit if exist
+  when: inventory_hostname in groups['ora-x1'] and acfsdgexist.stdout.find('does not exist') != -1
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  shell: "{{ stage_dir }}/createdg_acfs.sh"
+  register: existstat
+
+- name: Create an ASM volume for ACFS on first node with Name and Size
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/asmcmd volcreate -G {{ acfsdiskgroup }} -s {{ acfs_vol_size }} {{ acfs_vol_name }}
+  ignore_errors: yes
+  tags: acfs
+
+- name: Determine the device name of the volume that was created
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/asmcmd volinfo -G {{ asm_dg_name }} {{ acfs_vol_name }} | grep Device | sed 's/.*://'
+  register: device_name
+  ignore_errors: yes
+  tags: acfs
+
+- name: Create a cloud file system with the Oracle ACFS mkfs command
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  shell: "/sbin/mkfs -t acfs {{ device_name.stdout}}"
+  ignore_errors: yes
+  tags: acfs
+
+#- name: Create mount point directory to hold the volume
+#  action: file dest="{{ acfs_mount_name }}" state=directory owner="{{ oracle_user }}" group="{{ grid_group }}" mode=0755
+#  ignore_errors: True
+
+- name: ACFS autostart setup
+  become_user: "{{ root_user }}"
+  when: inventory_hostname in groups['ora-x1']
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/srvctl add filesystem -d {{ device_name.stdout }} -m {{ acfs_mount_name }} -u {{ grid_user }} -fstype {{ acfsdiskgroup }}  -autostart {{ autostarttype }}
+  tags: acfs
+  ignore_errors: True
+
+#- name: Mount the ACFS filesystem on the ASM Volume (ADVM) on node1
+#  when: inventory_hostname in groups['ora-x1']
+#  become_user: "{{ root_user }}"
+#  shell: "/bin/mount -t acfs {{ device_name.stdout }} {{ acfs_mount_name }}"
+#  tags: acfs
+#  ignore_errors: True
+#  args:
+#    warn: false # set warn=false to prevent warning
+
+- name: Start the new cloud file system
+  when: inventory_hostname in groups['ora-x1']
+  become_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/srvctl start filesystem -d {{ device_name.stdout }}
+  ignore_errors: True
+  no_log: True
+  tags: acfs

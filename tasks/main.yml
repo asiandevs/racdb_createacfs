@@ -1,0 +1,42 @@
+---
+# =====================================================================================
+# Setup ACFS using Ansible Automation for Oracle GI 19.3:
+# (1) create mount point with proper permission on both nodes
+# (2) Create an ASM DISKGROUP( Example: ACFS on ORA-X1)
+# (3) check the diskgroup status( from any node)
+# (4) Create a new ADVM volume in the diskgroup(ACFS):(ON ora-x1)
+# (5) Determine the Device Name:(ON ora-x1)
+# (6) Create ACFS Filesystem In the ADVM VOLUME with MKFS (On node 1) ( as grid owner)
+# (7) Register the ACFS Filesystem system with CRS
+# (8) Start the ACFS file system resource:( on node 1 from the root)
+# =====================================================================================
+
+- name: Setup ACFS | display pre setup message before setting up ACFS Filesystem
+  when: inventory_hostname in groups['ora-x1']
+  debug:
+    msg:
+      - 'This playbook is for setting up a ACFS Filesystem to 19c at {{ansible_date_time.iso8601}}:'
+
+- name:	   Set up ACFS Filesystem using Ansible
+  block:
+    - import_tasks: preinstallacfs.yml
+    - import_tasks: acfs_modulecheck_node1.yml
+    - import_tasks: acfs_modulecheck_node2.yml
+    - import_tasks: acfs_setup.yml
+    - import_tasks: acfs_validate.yml
+    - import_tasks: acfs_snaptest.yml
+  become:           yes
+  become_user:      root
+  
+- name: Remove stage directory
+  remote_user: "{{ root_user }}"
+  file: path={{ stage_dir }} state=absent
+  tags:
+    - removestgdir
+
+- name: display ACFS Filesystem setup post install message
+  when: inventory_hostname in groups['ora-x1']
+  debug:
+    msg:
+      - 'ACFS Filesystem setup completed successfully {{ansible_date_time.iso8601}}:'
+      - '- END OF ALL: git repository "racdb_createacfs" will be shared'

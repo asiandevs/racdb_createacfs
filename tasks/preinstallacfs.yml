@@ -1,0 +1,53 @@
+---
+# ========================================================#
+#                ACFS Setup  - PreInstall                 #
+# ========================================================#
+- name: Setup ACFS | create required directories
+  remote_user: "{{ root_user }}"
+  file:
+    path="{{ item }}"
+    state=directory
+    owner="{{ grid_user }}"
+    group="{{ grid_group }}"
+    mode=0775
+  with_items:
+    - "{{ stage_dir }}"
+    - "{{ acfs_mount_name }}"
+  tags:
+    - acfs_crdirs
+
+- name: Setup ACFS | Template - setup silent acfs diskgroup config script
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  template:
+      src=roles/racdb_createacfs/templates/createdg_acfs.sh.j2
+      dest={{ stage_dir }}/createdg_acfs.sh
+      owner="{{ grid_user }}"
+      group="{{ grid_group }}"
+      mode=0775
+  tags:
+    - acfs_slntcfg
+
+- name: Setup ACFS | Check the Mount status to the other nodes(ora-x2)
+  when: inventory_hostname in groups['ora-x2']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/asmcmd lsdg | grep {{ acfsdiskgroup }} | awk {'print $1'} 
+  register: acfsmodisk_mountstat
+  ignore_errors: yes
+  tags:
+    - acfs_mntdisk
+
+###asmcmd lsdg | grep DATA | awk {'print $1'}
+###MOUNTED
+
+- name: Mount the diskgroup from other nodes(ora-x2)
+  when: inventory_hostname in groups['ora-x2'] and acfsmodisk_mountstat.changed == false
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/asmcmd mount {{ acfsdiskgroup }}
+  ignore_errors: yes
+  tags:
+    - acfs_mntdisk

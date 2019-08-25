@@ -1,0 +1,20 @@
+root_user:                  root
+asm_instance:               "+ASM1"
+acfsdiskgroup:              acfs
+asm_dg_name:                acfs
+acfs_vol_name:              vol_acfst
+acfs_vol_size:              2G
+acfs_mount_name:            "{{ root_directory }}/app/oracle/acfsmnt"
+grid_user:                  grid
+oracle_user:                oracle
+grid_group:                 oinstall
+root_directory:             "/u02"
+stage_dir:                  "{{ root_directory }}/stage"
+grid_base:                  "{{ root_directory }}/app/grid"
+grid_home:                  "{{ root_directory }}/app/19.3.0/grid"
+mntacfs:                    "mkfs.acfs"
+autostarttype:               ALWAYS
+acfsdisks:                   ASM_DISK08
+vredundancy:                 EXTERNAL
+vausize:                     1
+vcompatibility:              19.0.0.0

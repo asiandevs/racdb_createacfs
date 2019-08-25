@@ -1,0 +1,41 @@
+---
+# ========================================================#
+#                ACFS Setup  - Validate                   #
+# ========================================================#
+- name: Check the a cloud file system status
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ grid_user }}"
+  shell: "shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/crsctl stat res ora.{{acfsdiskgroup|lower}}.{{acfs_vol_name|lower}}.acfs -t"
+  ignore_errors: yes
+  tags: acfs
+
+- name: ACFS status validate
+  when: inventory_hostname in groups['ora-x1']
+  remote_user: "{{ root_user }}"
+  become: yes
+  become_user: "{{ root_user }}"
+  action: shell export GRID_HOME={{ grid_home }}; {{ grid_home }}/bin/srvctl status filesystem -d {{ device_name.stdout }}
+  register: acfs_filestat
+  ignore_errors: True
+  tags: acfs
+
+- name: show result of ACFS filesystem status
+  when: inventory_hostname in groups['ora-x1']
+  debug:
+    msg: "{{ acfs_filestat.stdout_lines }}"
+    verbosity: 0
+  ignore_errors: True
+
+- name: ACFS mount points validate
+  become_user: "{{ root_user }}"
+  shell: "df -kh {{ acfs_mount_name }}"
+  register: device_mountpoint
+  tags: acfs
+
+- name: show result of ACFS filesystem status
+  debug:
+    msg: "{{ device_mountpoint.stdout_lines }}"
+    verbosity: 0
+  ignore_errors: True
